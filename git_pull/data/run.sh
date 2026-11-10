@@ -63,12 +63,26 @@ function git-clone {
     cp "${BACKUP_LOCATION}/secrets.yaml" /config 2>/dev/null || true
 }
 
+function is-ssh-url {
+    # SSH URLs are either "ssh://[user@]host[:port]/path" or the scp-like "user@host:path"
+    if [[ "$1" == ssh://* ]]; then
+        return 0
+    fi
+    [[ "$1" != *"://"* && "$1" == *@*:* ]]
+}
+
 function check-ssh-key {
 if [ -n "$DEPLOYMENT_KEY" ]; then
+    if ! is-ssh-url "$REPOSITORY"; then
+        bashio::log.info "[Info] Repository is not accessed via SSH, deployment_key is not used"
+        return
+    fi
     bashio::log.info "Check SSH connection"
-    IFS=':' read -ra GIT_URL_PARTS <<< "$REPOSITORY"
+    # Host part with optional user, e.g. "git@github.com" from "ssh://git@github.com/org/repo"
+    # or "git@github.com:org/repo"
+    DOMAIN="${REPOSITORY#ssh://}"
+    DOMAIN="${DOMAIN%%[:/]*}"
     # shellcheck disable=SC2029
-    DOMAIN="${GIT_URL_PARTS[0]}"
     if OUTPUT_CHECK=$(ssh -T -o "StrictHostKeyChecking=no" -o "BatchMode=yes" "$DOMAIN" 2>&1) || { [[ $DOMAIN = *"@github.com"* ]] && [[ $OUTPUT_CHECK = *"You've successfully authenticated"* ]]; }; then
         bashio::log.info "[Info] Valid SSH connection for $DOMAIN"
     else
