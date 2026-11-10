@@ -62,8 +62,10 @@ function git-clone {
     # remove config folder content
     rm -rf /config/{,.[!.],..?}* || bashio::exit.nok "[Error] Clearing /config failed"
 
-    # move the cloned repository (including .git) into /config
-    cp -a "${CLONE_DIR}/." /config/ || bashio::exit.nok "[Error] Copy cloned repository to /config failed"
+    # move the cloned repository (including .git) into /config. Copy the entries
+    # one by one: copying "${CLONE_DIR}/." would also apply the directory mode of
+    # the mktemp directory (0700) to /config itself.
+    find "${CLONE_DIR}" -mindepth 1 -maxdepth 1 -exec cp -a {} /config/ \; || bashio::exit.nok "[Error] Copy cloned repository to /config failed"
     rm -rf "$CLONE_DIR"
 
     # try to copy non-yaml files back (also excluding '.git' as it can corrupt the new repository)
