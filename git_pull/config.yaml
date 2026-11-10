@@ -41,7 +41,7 @@ schema:
   git_command: list(pull|reset)
   git_prune: bool
   deployment_key:
-    - str
+    - password
   deployment_user: str
   deployment_password: password
   deployment_key_protocol: match(rsa|ecdsa|ed25519)
