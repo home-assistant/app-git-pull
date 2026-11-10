@@ -42,6 +42,18 @@ function add-ssh-key {
 }
 
 function git-clone {
+    # Clone into a temporary directory first. /config is only modified once the
+    # clone succeeded, so a wrong repository URL or missing credentials can never
+    # wipe the existing configuration.
+    CLONE_DIR=$(mktemp -d "/tmp/git-pull-clone.XXXXXX") || bashio::exit.nok "[Error] Creation of temporary clone directory failed"
+    # mktemp always creates 0700; use the mode of /config so the copy below keeps it
+    chmod --reference=/config "$CLONE_DIR" || bashio::exit.nok "[Error] Setting mode of temporary clone directory failed"
+    bashio::log.info "[Info] Start git clone"
+    if ! git clone "$REPOSITORY" "$CLONE_DIR"; then
+        rm -rf "$CLONE_DIR"
+        bashio::exit.nok "[Error] Git clone failed, /config was not modified"
+    fi
+
     # create backup
     BACKUP_LOCATION="/tmp/config-$(date +%Y-%m-%d_%H-%M-%S)"
     bashio::log.info "[Info] Backup configuration to $BACKUP_LOCATION"
@@ -52,9 +64,9 @@ function git-clone {
     # remove config folder content
     rm -rf /config/{,.[!.],..?}* || bashio::exit.nok "[Error] Clearing /config failed"
 
-    # git clone
-    bashio::log.info "[Info] Start git clone"
-    git clone "$REPOSITORY" /config || bashio::exit.nok "[Error] Git clone failed"
+    # move the cloned repository (including .git) into /config
+    cp -a "${CLONE_DIR}/." /config/ || bashio::exit.nok "[Error] Copy cloned repository to /config failed"
+    rm -rf "$CLONE_DIR"
 
     # try to copy non-yaml files back (also excluding '.git' as it can corrupt the new repository)
     find "${BACKUP_LOCATION}" -maxdepth 1 -mindepth 1 ! -name "*.yaml" ! -name "*.yml" ! -name ".git" -exec cp -r {} /config/ \; 2>/dev/null || true
